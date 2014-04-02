@@ -4,13 +4,14 @@ using System.Linq;
 using System.Text;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using System.IO;
 
 namespace LookupComparison
 {
     class TestDriver
     {
         // count of test iterations
-        const int Iterations = 1000;
+        const int Iterations = 10000;
 
         // max size of array to compare
         const int MaxSize    = 1000000;
@@ -22,7 +23,8 @@ namespace LookupComparison
         /// </summary>
         static string GetRandomString()
         {
-            return Guid.NewGuid().ToString();
+            return Path.GetRandomFileName();
+            //return Guid.NewGuid().ToString();
         }
 
         #endregion
@@ -43,26 +45,28 @@ namespace LookupComparison
             Console.ReadKey();
         }
 
-        private static void RunTest(string[] testKeys, int[] testValues, int iterations)
+        private static void RunTest(string[] testKeys, int[] testValues, int elementsCount)
         {
             Console.WriteLine();
-            Console.WriteLine("Running test for {0} elements", iterations);
+            Console.WriteLine("Running test for {0} elements", elementsCount);
 
             var sw = Stopwatch.StartNew();
-            var arrayMap = CreateArrayMap2(testKeys, testValues, iterations);
+            var arrayMap = CreateArrayMap(testKeys, testValues, elementsCount);
             Console.WriteLine("Creating array-based map took {0} ms", sw.ElapsedMilliseconds);
 
-            sw = Stopwatch.StartNew();
-            var hashMap = CreateHashMap(testKeys, testValues, iterations);
+            sw.Restart();
+            var hashMap = CreateHashMap(testKeys, testValues, elementsCount);
             Console.WriteLine("Creating hash-based map took {0} ms", sw.ElapsedMilliseconds);
 
-            sw = Stopwatch.StartNew();
-            var treeMap = CreateTreeMap(testKeys, testValues, iterations);
+            sw.Restart();
+            var treeMap = CreateTreeMap(testKeys, testValues, elementsCount);
             Console.WriteLine("Creating tree-based map took {0} ms", sw.ElapsedMilliseconds);
 
-            sw = Stopwatch.StartNew();
-            var sortedListMap = CreateSortedListMap(testKeys, testValues, iterations);
-            Console.WriteLine("Creating sortedlist-based map took {0} ms", sw.ElapsedMilliseconds);
+            sw.Restart();
+            LookupArrayMap(testKeys, testValues, arrayMap, elementsCount);
+            Console.WriteLine("Looking up array-based map took {0} ms, {1} ns per lookup",
+                sw.ElapsedMilliseconds, sw.ElapsedTicks * 10 / elementsCount);
+
         }
 
         static Tuple<string[], int[]> CreateArrayMap(string[] testKeys, int[] testValues, int elementCount)
@@ -76,13 +80,31 @@ namespace LookupComparison
 
         static void LookupArrayMap(string[] testKeys, int[] testValues, Tuple<string[], int[]> map, int iterationCount)
         {
+            var keys = map.Item1;
+            var values = map.Item2;
+
             for (int i = 0; i < iterationCount; i++)
             {
                 var testKey = testKeys[i];
                 var expectedValue = testValues[i];
-
-                var actualValue = 
+                var actualValue = LookupArrayItem(testKey, keys, values);
+                
+                if (expectedValue != actualValue)
+                {
+                    throw new ApplicationException("expectedValue != actualValue");
+                }
             }
+        }
+
+        private static int LookupArrayItem(string testKey, string[] keys, int[] values)
+        {
+            var index = Array.BinarySearch<string>(keys, testKey);
+            if (index < 0)
+            {
+                throw new ArgumentOutOfRangeException("testKey");
+            }
+
+            return values[index];
         }
 
         static Tuple<string[], int[]> CreateArrayMap2(string[] testKeys, int[] testValues, int elementCount)
@@ -115,13 +137,6 @@ namespace LookupComparison
                 dic.Add(testKeys[i], testValues[i]);
             }
 
-            return dic;
-        }
-
-        static SortedList<string, int> CreateSortedListMap(string[] testKeys, int[] testValues, int elementCount)
-        {
-            var tmp = CreateHashMap(testKeys, testValues, elementCount);
-            var dic = new SortedList<string, int>(tmp);
             return dic;
         }
     }
